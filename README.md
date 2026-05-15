@@ -11,7 +11,15 @@ Serverless pipeline (TypeScript, Node 24) that consumes CloudFront access logs f
 ## Environment Variables
 
 - `MATOMO_URL` (required): Base Matomo URL, e.g. `https://analytics.example.com` or `https://analytics.example.com/matomo`.
-- `MATOMO_SITE_ID` (required): Matomo site ID (integer).
+- `MATOMO_SITE_ID` (required if `SITE_ID_MAP` is not set): Matomo site ID (integer). Used for all log files when no `SITE_ID_MAP` is configured.
+- `SITE_ID_MAP` (required if `MATOMO_SITE_ID` is not set): JSON object mapping S3 key prefixes (i.e. the first path component) to Matomo site IDs. Log files whose prefix is not listed are silently ignored.
+
+  Example — if logs land at `s3://my-bucket/www.site-a.com/…` and `s3://my-bucket/www.site-b.com/…`:
+  ```
+  SITE_ID_MAP={"www.site-a.com":1,"www.site-b.com":2}
+  ```
+
+  Both variables can be set simultaneously: `SITE_ID_MAP` takes precedence for known prefixes, and `MATOMO_SITE_ID` has no effect when a map is active (unknown prefixes are still skipped).
 - `MATOMO_TIMEOUT_MS` (optional, default `5000`): HTTP timeout in ms.
 - `MATOMO_TOKEN_AUTH` (optional, recommended): Matomo token; required when `cdt` is older than 24 hours (Matomo bulk import rule). Sent as `Authorization: Bearer <token>`.
 - `BATCH_SIZE` (optional, default `20`): Hit count per Matomo batch.

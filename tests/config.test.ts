@@ -90,10 +90,49 @@ describe('getConfig', () => {
     );
   });
 
-  it('throws when MATOMO_SITE_ID is missing', () => {
+  it('throws when neither MATOMO_SITE_ID nor SITE_ID_MAP is set', () => {
     expect(() => getConfig({ MATOMO_URL: baseEnv.MATOMO_URL })).toThrow(
-      /MATOMO_SITE_ID is required/
+      /Either MATOMO_SITE_ID or SITE_ID_MAP is required/
     );
+  });
+
+  it('accepts SITE_ID_MAP without MATOMO_SITE_ID', () => {
+    const config = getConfig({
+      MATOMO_URL: baseEnv.MATOMO_URL,
+      SITE_ID_MAP: '{"www.site-a.com":1,"www.site-b.com":2}'
+    });
+    expect(config.matomoSiteId).toBeUndefined();
+    expect(config.siteIdMap).toEqual({ 'www.site-a.com': 1, 'www.site-b.com': 2 });
+  });
+
+  it('accepts both MATOMO_SITE_ID and SITE_ID_MAP', () => {
+    const config = getConfig({
+      ...baseEnv,
+      SITE_ID_MAP: '{"www.site-a.com":5}'
+    });
+    expect(config.matomoSiteId).toBe(42);
+    expect(config.siteIdMap).toEqual({ 'www.site-a.com': 5 });
+  });
+
+  it('throws on invalid SITE_ID_MAP JSON', () => {
+    expect(() =>
+      getConfig({ MATOMO_URL: baseEnv.MATOMO_URL, SITE_ID_MAP: '{invalid' })
+    ).toThrow(/SITE_ID_MAP must be valid JSON/);
+  });
+
+  it('throws on non-object SITE_ID_MAP', () => {
+    expect(() =>
+      getConfig({ MATOMO_URL: baseEnv.MATOMO_URL, SITE_ID_MAP: '[1,2,3]' })
+    ).toThrow(/SITE_ID_MAP must be a JSON object/);
+  });
+
+  it('throws on non-integer site ID in SITE_ID_MAP', () => {
+    expect(() =>
+      getConfig({
+        MATOMO_URL: baseEnv.MATOMO_URL,
+        SITE_ID_MAP: '{"www.site-a.com":"not-a-number"}'
+      })
+    ).toThrow(/SITE_ID_MAP: invalid site ID/);
   });
 
   it('throws when numeric fields are not integers', () => {

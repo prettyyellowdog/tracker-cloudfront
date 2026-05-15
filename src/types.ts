@@ -11,7 +11,8 @@ export type CloudFrontLogEntry = Record<string, string>;
 
 export interface MatomoConfig {
   matomoUrl: string;
-  matomoSiteId: number;
+  matomoSiteId?: number;
+  siteIdMap?: Record<string, number>;
   matomoTokenAuth?: string;
   batchSize: number;
   matomoTimeoutMs: number;

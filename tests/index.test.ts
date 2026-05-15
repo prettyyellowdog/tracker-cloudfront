@@ -70,12 +70,80 @@ describe('handler', () => {
     const originalEnv = { ...process.env };
     delete process.env.MATOMO_URL;
     delete process.env.MATOMO_SITE_ID;
+    delete process.env.SITE_ID_MAP;
     const response = await handler({
       Records: [{ s3: { bucket: { name: 'bucket' }, object: { key: 'key' } } }]
     });
     expect(response.statusCode).toBe(500);
     expect(JSON.parse(response.body).error).toMatch(/MATOMO_URL is required/);
     process.env = originalEnv;
+  });
+
+  it('routes S3 key to site ID from SITE_ID_MAP', async () => {
+    const originalEnv = { ...process.env };
+    process.env.MATOMO_URL = 'https://analytics.example.com';
+    delete process.env.MATOMO_SITE_ID;
+    process.env.SITE_ID_MAP = '{"www.site-a.com":10,"www.site-b.com":20}';
+    const sendSpy = vi
+      .spyOn(processor, 'sendLogLinesToMatomo')
+      .mockResolvedValue(undefined);
+    vi.spyOn(s3, 'getObjectLineIterator').mockResolvedValue(
+      (async function* () {})()
+    );
+
+    try {
+      await handler({
+        Records: [
+          {
+            s3: {
+              bucket: { name: 'bucket' },
+              object: { key: 'www.site-a.com/log.gz' }
+            }
+          }
+        ]
+      });
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+      const calledConfig = sendSpy.mock.calls[0][1];
+      expect(calledConfig.matomoSiteId).toBe(10);
+    } finally {
+      process.env = originalEnv;
+      sendSpy.mockRestore();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('skips S3 keys whose prefix is not in SITE_ID_MAP', async () => {
+    const originalEnv = { ...process.env };
+    process.env.MATOMO_URL = 'https://analytics.example.com';
+    delete process.env.MATOMO_SITE_ID;
+    process.env.SITE_ID_MAP = '{"www.site-a.com":10}';
+    const sendSpy = vi
+      .spyOn(processor, 'sendLogLinesToMatomo')
+      .mockResolvedValue(undefined);
+    vi.spyOn(s3, 'getObjectLineIterator').mockResolvedValue(
+      (async function* () {})()
+    );
+
+    try {
+      const response = await handler({
+        Records: [
+          {
+            s3: {
+              bucket: { name: 'bucket' },
+              object: { key: 'www.unknown.com/log.gz' }
+            }
+          }
+        ]
+      });
+      expect(response.statusCode).toBe(200);
+      expect(sendSpy).not.toHaveBeenCalled();
+      const body = JSON.parse(response.body);
+      expect(body.processed).toBe(0);
+    } finally {
+      process.env = originalEnv;
+      sendSpy.mockRestore();
+      vi.restoreAllMocks();
+    }
   });
 
   it('returns 500 when S3 iterator fails', async () => {

@@ -51,6 +51,30 @@ const parseHttpMethodAllowlist = (
   return Array.from(new Set(methods));
 };
 
+const parseSiteIdMap = (raw: string | undefined): Record<string, number> => {
+  if (!raw?.trim()) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      'SITE_ID_MAP must be valid JSON, e.g. {"www.site-a.com":1,"www.site-b.com":2}'
+    );
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('SITE_ID_MAP must be a JSON object mapping prefixes to site IDs');
+  }
+  const map: Record<string, number> = {};
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    const id = Number.parseInt(String(value), 10);
+    if (Number.isNaN(id)) {
+      throw new Error(`SITE_ID_MAP: invalid site ID "${value}" for key "${key}"`);
+    }
+    map[key] = id;
+  }
+  return map;
+};
+
 export function getConfig(
   env: Record<string, string | undefined> = process.env
 ): MatomoConfig {
@@ -59,13 +83,11 @@ export function getConfig(
     throw new Error('MATOMO_URL is required');
   }
 
-  const siteIdRaw = env.MATOMO_SITE_ID;
-  if (!siteIdRaw) {
-    throw new Error('MATOMO_SITE_ID is required');
-  }
-  const matomoSiteId = toInt(siteIdRaw);
-  if (matomoSiteId === undefined) {
-    throw new Error('MATOMO_SITE_ID is required');
+  const matomoSiteId = toInt(env.MATOMO_SITE_ID);
+  const siteIdMap = parseSiteIdMap(env.SITE_ID_MAP);
+
+  if (!matomoSiteId && Object.keys(siteIdMap).length === 0) {
+    throw new Error('Either MATOMO_SITE_ID or SITE_ID_MAP is required');
   }
 
   const batchSize = toInt(env.BATCH_SIZE, 20) ?? 20;
@@ -105,6 +127,7 @@ export function getConfig(
   return {
     matomoUrl,
     matomoSiteId,
+    siteIdMap,
     matomoTokenAuth,
     batchSize,
     matomoTimeoutMs,

@@ -25,12 +25,31 @@ export const handler = async (
 
     if (s3Records.length > 0) {
       const config = getConfig();
+      const siteIdMap = config.siteIdMap ?? {};
+      const hasSiteIdMap = Object.keys(siteIdMap).length > 0;
       let processed = 0;
       for (const record of s3Records) {
         const bucket = record.s3.bucket.name;
         const key = decodeURIComponent(record.s3.object.key);
+        const prefix = key.split('/')[0];
+        let siteId: number | undefined;
+        if (hasSiteIdMap) {
+          siteId = siteIdMap[prefix];
+          if (siteId === undefined) {
+            console.warn('No site ID configured for S3 prefix, skipping', {
+              prefix,
+              bucket
+            });
+            continue;
+          }
+        } else {
+          siteId = config.matomoSiteId;
+        }
         const lines = await getObjectLineIterator(bucket, key, config.logLevel);
-        await processor.sendLogLinesToMatomo(lines, config);
+        await processor.sendLogLinesToMatomo(lines, {
+          ...config,
+          matomoSiteId: siteId
+        });
         processed += 1;
       }
       return {

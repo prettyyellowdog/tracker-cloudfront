@@ -31,17 +31,18 @@ export const handler = async (
       for (const record of s3Records) {
         const bucket = record.s3.bucket.name;
         const key = decodeURIComponent(record.s3.object.key);
-        const prefix = key.split('/')[0];
         let siteId: number | undefined;
         if (hasSiteIdMap) {
-          siteId = siteIdMap[prefix];
-          if (siteId === undefined) {
+          const index = Object.keys(siteIdMap).find(prefix => key.startsWith(prefix + '/'));
+          if (!index) {
             console.warn('No site ID configured for S3 prefix, skipping', {
-              prefix,
+              key,
               bucket
             });
             continue;
           }
+          siteId = siteIdMap[index];
+          console.log(`Processing ${index} as SiteID ${siteId}`);
         } else {
           siteId = config.matomoSiteId;
         }

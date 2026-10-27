@@ -2,6 +2,7 @@ import type { S3Event } from 'aws-lambda';
 import { getConfig } from './config.js';
 import * as processor from './processor.js';
 import { getObjectLineIterator } from './s3.js';
+import { createLogger } from './logger.js';
 
 type HandlerResponse = {
   statusCode: number;
@@ -25,6 +26,9 @@ export const handler = async (
 
     if (s3Records.length > 0) {
       const config = getConfig();
+      const logLevel = config.logLevel;
+      const log = createLogger(logLevel);
+
       const siteIdMap = config.siteIdMap ?? {};
       const hasSiteIdMap = Object.keys(siteIdMap).length > 0;
       let processed = 0;
@@ -42,7 +46,7 @@ export const handler = async (
             continue;
           }
           siteId = siteIdMap[index];
-          console.log(`Processing ${index} as SiteID ${siteId}`);
+          log.info(`Processing ${index} as SiteID ${siteId}`);
         } else {
           siteId = config.matomoSiteId;
         }

@@ -41,7 +41,7 @@ export async function getObjectLineIterator(
   const log = createLogger(logLevel);
   const command = new GetObjectCommand({ Bucket: bucket, Key: key });
   const response = await client.send(command);
-  log.info('S3 getObject start', {
+  log.debug('S3 getObject start', {
     bucket,
     key,
     contentLength: response.ContentLength
@@ -59,7 +59,7 @@ export async function getObjectLineIterator(
         count += 1;
         yield line;
       }
-      log.info('S3 getObject complete', { bucket, key, lines: count });
+      log.debug('S3 getObject complete', { bucket, key, lines: count });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log.error('S3 stream error', {
